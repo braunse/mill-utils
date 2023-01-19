@@ -19,7 +19,7 @@ object meta extends Module {
 
   def versionFromEnv = T.input { Properties.propOrNone("PUBLISH_VERSION") }
   def versionFromGitSha = T.input { optString(os.proc("git", "rev-parse", "--short", "HEAD").call().out.trim) }
-  def versionFromGitTag = T.input { optString(os.proc("git", "tag", "-l", "-n0", "--points-at", "HEAD").call().out.trim) }
+  def versionFromGitTag = T.input { optString(os.proc("git", "tag", "-l", "-n0", "--points-at", "HEAD").call().out.trim.stripPrefix("v")) }
   def publishVersion = T { (versionFromEnv() orElse versionFromGitTag() orElse versionFromGitSha()).getOrElse("latest") }
 }
 
