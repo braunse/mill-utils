@@ -10,6 +10,8 @@ package de.sebbraun.millutils
 
 import mill.scalalib._
 
+import scala.language.implicitConversions
+
 sealed abstract class LangVersion(val value: String)
 object LangVersion {
   case object Java       extends LangVersion(":")
@@ -40,44 +42,75 @@ case class DepGroup(groupID: String, version: String, prefix: String = "") {
         throw new IllegalArgumentException(
           "Either suffix or artifactID must be non-null"
         )
-    val theVersion = if(version != null) version else this.version
+    val theVersion = if (version != null) version else this.version
     ivy"$theGroupID${langVersion.value}$theArtifactID${platform.value}$theVersion"
   }
 
   def java(
-    suffix: String = null,
-    artifactID: String = null,
-    groupID: String = null,
-    version: String = null
-  ): Dep = assemble(suffix, artifactID, groupID, version, LangVersion.Java, Platform.Jvm)
+      suffix: String = null,
+      artifactID: String = null,
+      groupID: String = null,
+      version: String = null
+  ): Dep = assemble(
+    suffix,
+    artifactID,
+    groupID,
+    version,
+    LangVersion.Java,
+    Platform.Jvm
+  )
 
   def jvm(
-    suffix: String = null,
-    artifactID: String = null,
-    groupID: String = null,
-    version: String = null
-  ):  Dep = assemble(suffix, artifactID, groupID, version, LangVersion.ScalaMajor, Platform.Jvm)
+      suffix: String = null,
+      artifactID: String = null,
+      groupID: String = null,
+      version: String = null
+  ): Dep = assemble(
+    suffix,
+    artifactID,
+    groupID,
+    version,
+    LangVersion.ScalaMajor,
+    Platform.Jvm
+  )
 
   def js(
-    suffix: String = null,
-    artifactID: String = null,
-    groupID: String = null,
-    version: String = null
-  ): Dep = assemble(suffix, artifactID, groupID, version, LangVersion.ScalaMajor, Platform.Other)
+      suffix: String = null,
+      artifactID: String = null,
+      groupID: String = null,
+      version: String = null
+  ): Dep = assemble(
+    suffix,
+    artifactID,
+    groupID,
+    version,
+    LangVersion.ScalaMajor,
+    Platform.Other
+  )
 
   def multi(
-    suffix: String = null,
-    artifactID: String = null,
-    groupID: String = null,
-    version: String = null
-  ): MultiDep = MultiDep(jvm = jvm(suffix, artifactID, groupID, version), js = js(suffix, artifactID, groupID, version))
+      suffix: String = null,
+      artifactID: String = null,
+      groupID: String = null,
+      version: String = null
+  ): MultiDep = MultiDep(
+    jvm = jvm(suffix, artifactID, groupID, version),
+    js = js(suffix, artifactID, groupID, version)
+  )
 
   private[millutils] lazy val selfArtifactID = prefix match {
-    case "" => throw new IllegalStateException("Prefix must be given to use the `self` object")
+    case "" =>
+      throw new IllegalStateException(
+        "Prefix must be given to use the `self` object"
+      )
     case s => s.stripSuffix("-")
   }
 
-  object self extends MultiDep(jvm = jvm(artifactID = selfArtifactID), js =  js(artifactID = selfArtifactID)) {
+  object self
+      extends MultiDep(
+        jvm = jvm(artifactID = selfArtifactID),
+        js = js(artifactID = selfArtifactID)
+      ) {
     val java = DepGroup.this.java(artifactID = selfArtifactID)
   }
 }

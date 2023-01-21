@@ -10,20 +10,22 @@ package de.sebbraun.millutils
 
 import mill._
 import mill.define._
-import mill.scalalib._
 import mill.scalajslib._
+import mill.scalalib._
+
+import scala.language.implicitConversions
 
 trait SharedModule extends Module { mod =>
 
   def scalaVersion: String
   def scalaJSVersion: String
 
-  def ivyDeps: T[Agg[MultiDep]]     = T { Agg() }
-  def frontendIvyDeps: T[Agg[Dep]]       = T { Agg() }
-  def backendIvyDeps: T[Agg[Dep]]        = T { Agg() }
-  def testIvyDeps: T[Agg[MultiDep]] = T { Agg() }
-  def frontendTestIvyDeps: T[Agg[Dep]]   = T { Agg() }
-  def backendTestIvyDeps: T[Agg[Dep]]    = T { Agg() }
+  def ivyDeps: T[Agg[MultiDep]]        = T { Agg() }
+  def frontendIvyDeps: T[Agg[Dep]]     = T { Agg() }
+  def backendIvyDeps: T[Agg[Dep]]      = T { Agg() }
+  def testIvyDeps: T[Agg[MultiDep]]    = T { Agg() }
+  def frontendTestIvyDeps: T[Agg[Dep]] = T { Agg() }
+  def backendTestIvyDeps: T[Agg[Dep]]  = T { Agg() }
 
   def moduleDeps: Seq[SharedModule]       = Seq()
   def backendModuleDeps: Seq[Module]      = Seq()
@@ -63,8 +65,8 @@ trait SharedModule extends Module { mod =>
         )
     }
 
-    def scalaVersion   = mod.scalaVersion
-    def scalaJSVersion = mod.scalaJSVersion
+    def scalaVersion            = mod.scalaVersion
+    def scalaJSVersion          = mod.scalaJSVersion
     override def millSourcePath = mod.millSourcePath
 
     override def sources = T.sources(
@@ -82,7 +84,7 @@ trait SharedModule extends Module { mod =>
     override def moduleDeps =
       (mod.moduleDeps ++ mod.frontendModuleDeps).map(mapModuleDep)
 
-    trait Tests extends super.Tests {
+    trait FrontendTests extends super.Tests {
       override def millSourcePath = mod.millSourcePath
 
       override def testFramework = T { frontendTestFramework() }
@@ -117,7 +119,7 @@ trait SharedModule extends Module { mod =>
         )
     }
 
-    def scalaVersion   = mod.scalaVersion
+    def scalaVersion            = mod.scalaVersion
     override def millSourcePath = mod.millSourcePath
 
     override def sources = T.sources(
@@ -136,7 +138,7 @@ trait SharedModule extends Module { mod =>
       mod.moduleDeps.map(mapModuleDep) ++
         mod.backendModuleDeps.map(mapModuleDep)
 
-    trait Tests extends super.Tests {
+    trait BackendTests extends super.Tests {
       override def millSourcePath = mod.millSourcePath
 
       override def testFramework = T { backendTestFramework() }
@@ -164,6 +166,8 @@ trait SharedModule extends Module { mod =>
 }
 
 trait SharedModuleImplicits {
-  implicit def sharedModuleAsBackend(m: SharedModule): m.BackendModule = m.backend
-  implicit def sharedModuleAsFrontend(m: SharedModule): m.FrontendModule = m.frontend
+  implicit def sharedModuleAsBackend(m: SharedModule): m.BackendModule =
+    m.backend
+  implicit def sharedModuleAsFrontend(m: SharedModule): m.FrontendModule =
+    m.frontend
 }
