@@ -17,7 +17,7 @@ object meta extends Module {
       else Some(st)
     }
 
-  def versionFromEnv = T.input { Properties.propOrNone("PUBLISH_VERSION") }
+  def versionFromEnv = T.input { T.env.get("PUBLISH_VERSION") }
   def versionFromGitSha = T.input { optString(os.proc("git", "rev-parse", "--short", "HEAD").call().out.trim) }
   def versionFromGitTag = T.input { optString(os.proc("git", "tag", "-l", "-n0", "--points-at", "HEAD").call().out.trim.stripPrefix("v")) }
   def publishVersion = T { (versionFromEnv() orElse versionFromGitTag() orElse versionFromGitSha()).getOrElse("latest") }
@@ -25,6 +25,8 @@ object meta extends Module {
 
 object utils extends ScalaModule with PublishModule {
     def scalaVersion = "2.13.10"
+
+    def scalacOptions = Seq("-deprecation", "-feature")
 
     def ivyDeps = Agg(
       ivy"com.lihaoyi::mill-scalalib:${millVersion()}",
