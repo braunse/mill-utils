@@ -21,10 +21,14 @@ trait SharedPublishModule extends SharedModule { outer =>
     override def moduleDeps: Seq[ScalaJSModule with PublishModule] = super.moduleDeps.map(_.asInstanceOf[ScalaJSModule with PublishModule])
   }
 
-  trait BackendPublishModule extends PublishModule {
+  override val frontend: FrontendPublishModule
+
+  trait BackendPublishModule extends BackendModule with PublishModule {
     override def artifactName = T{ outer.artifactName() }
     def publishVersion = T{ outer.publishVersion() }
     def pomSettings = T{ outer.pomSettings() }
     override def moduleDeps: Seq[ScalaModule with PublishModule] = super.moduleDeps.map(_.asInstanceOf[ScalaModule with PublishModule])
   }
+
+  override val backend: BackendPublishModule
 }
