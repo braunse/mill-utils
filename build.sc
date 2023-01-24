@@ -1,4 +1,3 @@
-import scala.util.Properties
 import mill.scalalib._
 import mill.scalalib.publish._
 
