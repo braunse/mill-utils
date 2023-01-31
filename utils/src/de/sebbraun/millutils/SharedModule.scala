@@ -8,6 +8,8 @@
 
 package de.sebbraun.millutils
 
+import coursier.Repository
+import coursier.Resolve
 import mill._
 import mill.define._
 import mill.scalajslib._
@@ -19,6 +21,10 @@ trait SharedModule extends Module { mod =>
 
   def scalaVersion: String
   def scalaJSVersion: String
+
+  def repositoriesTask: Task[Seq[Repository]] = T.task {
+    Resolve.defaultRepositories
+  }
 
   def ivyDeps: T[Agg[MultiDep]]        = T { Agg() }
   def frontendIvyDeps: T[Agg[Dep]]     = T { Agg() }
@@ -77,6 +83,10 @@ trait SharedModule extends Module { mod =>
       sharedResources() ++ frontendResources()
     )
 
+    override def repositoriesTask = T.task {
+      mod.repositoriesTask()
+    }
+
     override def ivyDeps = T {
       mod.ivyDeps().map(_.js) ++ mod.frontendIvyDeps()
     }
@@ -88,6 +98,10 @@ trait SharedModule extends Module { mod =>
       override def millSourcePath = mod.millSourcePath
 
       override def testFramework = T { frontendTestFramework() }
+
+      override def repositoriesTask = T.task {
+        mod.repositoriesTask()
+      }
 
       override def sources = T.sources(
         sharedTestSources() ++ frontendTestSources()
@@ -130,6 +144,10 @@ trait SharedModule extends Module { mod =>
       sharedResources() ++ backendResources()
     )
 
+    override def repositoriesTask = T.task {
+      mod.repositoriesTask()
+    }
+
     override def ivyDeps = T {
       mod.ivyDeps().map(_.jvm) ++ mod.backendIvyDeps()
     }
@@ -150,6 +168,10 @@ trait SharedModule extends Module { mod =>
       override def resources = T.sources(
         sharedTestResources() ++ backendTestResources()
       )
+
+      override def repositoriesTask = T.task {
+        mod.repositoriesTask()
+      }
 
       override def ivyDeps = T {
         testIvyDeps().map(_.jvm) ++ backendTestIvyDeps()
