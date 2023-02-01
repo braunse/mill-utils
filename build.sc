@@ -37,7 +37,7 @@ object utils extends ScalaModule with PublishModule {
     def publishVersion = meta.publishVersion()
     def pomSettings = PomSettings(
       description = "Utilities for Mill in my projects",
-      organization = "de.sebbraun.mill-utils",
+      organization = "de.sebbraun",
       url = "https://github.com/braunse/mill-utils",
       licenses = Seq(License.`MPL-2.0`),
       versionControl = VersionControl.github("braunse", "mill-utils"),
