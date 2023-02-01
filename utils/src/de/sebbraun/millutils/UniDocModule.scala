@@ -47,25 +47,131 @@ trait UniDocModule extends mill.Module with CoursierModule {
 
   def platformSuffix: T[String] = T { "" }
 
-  override def resolveCoursierDependency: Task[Dep => Dependency] = T.task { (d: Dep) =>
-    Lib.depToDependency(d, scalaVersion(), platformSuffix())
+  override def resolveCoursierDependency: Task[Dep => Dependency] = T.task {
+    (d: Dep) =>
+      Lib.depToDependency(d, scalaVersion(), platformSuffix())
   }
 
   def resolveUniDocClasspathDep: Task[Dep => Dependency] = T.task {
     resolveCoursierDependency()
   }
 
-  def resolveUniDocInputDep: Task[Dep => Dependency] = T.task { (d: Dep) =>
-    val resolve = resolveUniDocClasspathDep()
-    resolve(d).withTransitive(false)
+  def resolveUniDocInputDep: Task[Dep => Dependency] = T.task {
+    resolveUniDocClasspathDep()
   }
+
+  def customizeUniDocInputDep: Task[Dep => Dep] = T.task { (dep: Dep) =>
+    val dep1 = uniDocInputExclusions().iterator.foldLeft(dep) { (dep, gn) =>
+      val (g, n, cs) = gn.split(":") match {
+        case Array(NES(group), NES(name)) =>
+          (group, name, List(CrossVersion.empty(false)))
+        case Array(NES(group), "", NES(name)) =>
+          (
+            group,
+            name,
+            List(CrossVersion.Binary(false), CrossVersion.Binary(true))
+          )
+        case Array(NES(group), "", "", NES(name)) =>
+          (group, name, List(CrossVersion.Full(false), CrossVersion.Full(true)))
+        case _ =>
+          throw new IllegalArgumentException(
+            s"Exclusion should match group:[:[:]]name format"
+          )
+      }
+      assert(g != "" && n != "")
+
+      dep.exclude(
+        cs.map(c =>
+          g -> (n + c.suffixString(
+            ZincWorkerUtil.scalaBinaryVersion(scalaVersion()),
+            scalaVersion(),
+            platformSuffix()
+          ))
+        ): _*
+      )
+    }
+
+    val dep2 = dep1.excludeOrg(uniDocInputOrgExclusions().iterator.toSeq: _*)
+
+    val dep3 = dep2.excludeName(uniDocInputNameExclusions().iterator.toSeq: _*)
+
+    dep3
+  }
+
+  def customizeUniDocClasspathDep: Task[Dep => Dep] = T.task {
+    identity[Dep] _
+  }
+
+  def uniDocInputExclusions: T[Agg[String]] = T { Agg.empty[String] }
+
+  def uniDocInputOrgExclusions: T[Agg[String]] = T { Agg.empty[String] }
+
+  def uniDocInputNameExclusions: T[Agg[String]] = T { Agg.empty[String] }
 
   def uniDocIvyDeps: T[Agg[Dep]] = T { Agg.empty[Dep] }
 
   def uniDocModuleDeps: Seq[ScalaModule] = Seq()
 
+  def ivyDepConflictTask: Task[Iterable[Dep] => Option[Dep]] =
+    T.task { (candidates: Iterable[Dep]) =>
+      candidates.headOption
+    }
+
+  def uniDocInputExclusionFilter: Task[Dep => Boolean] = T.task {
+    val gns = uniDocInputExclusions().map(s => ":+".r.split(s) match {
+      case Array(group, name) => (group, name)
+      case _ => throw new IllegalArgumentException(s"Exclusion $s does not match group:[:[:]]name format")
+    }).iterator.toSet
+    val gs = uniDocInputOrgExclusions()
+    val ns = uniDocInputNameExclusions()
+
+    {
+      (d: Dep) =>
+        !(
+          gns.contains(d.dep.module.organization.value, d.dep.module.name.value) ||
+          gs.contains(d.dep.module.organization.value) ||
+          ns.contains(d.dep.module.name.value)
+        )
+    }
+  }
+
+  def collectedIvyDeps: T[Agg[Dep]] = T {
+    val filterFn = uniDocInputExclusionFilter()
+
+    val ivyDepsFromModules = T
+      .traverse(uniDocModuleDeps)(_.transitiveIvyDeps)()
+      .flatten
+      .filter(filterFn)
+    val compileIvyDepsFromModules = T
+      .traverse(uniDocModuleDeps)(_.transitiveCompileIvyDeps)()
+      .flatten
+      .filter(filterFn)
+
+    val allCandidates =
+      ivyDepsFromModules ++ compileIvyDepsFromModules ++ uniDocIvyDeps()
+
+    val conflictFn = ivyDepConflictTask()
+    allCandidates
+      .groupBy(d => d.dep.module.orgName)
+      .values
+      .flatMap {
+        case Seq(unique) => Some(unique)
+        case nonUnique   => conflictFn(nonUnique)
+      }
+  }
+
   def uniDocModuleCompiledClasses: T[Agg[PathRef]] = T {
     T.traverse(uniDocModuleDeps)(_.compile)().map(_.classes)
+  }
+
+  def uniDocInputIvyDeps: T[Agg[Dep]] = T {
+    val customizeFn = customizeUniDocInputDep()
+    collectedIvyDeps().map(customizeFn)
+  }
+
+  def uniDocClasspathIvyDeps: T[Agg[Dep]] = T {
+    val customizeFn = customizeUniDocClasspathDep()
+    collectedIvyDeps().map(customizeFn)
   }
 
   def uniDocInputs: T[Agg[PathRef]] = T {
@@ -73,11 +179,7 @@ trait UniDocModule extends mill.Module with CoursierModule {
       ivys <- Lib.resolveDependencies(
         repositories = repositoriesTask(),
         depToDependency = resolveUniDocInputDep(),
-        deps = uniDocIvyDeps() ++
-          T.traverse(uniDocModuleDeps)(m =>
-            T.task { m.ivyDeps() ++ m.compileIvyDeps() }
-          )()
-            .flatten
+        deps = uniDocInputIvyDeps()
       )
     } yield {
       val tasties = Lib
@@ -92,13 +194,12 @@ trait UniDocModule extends mill.Module with CoursierModule {
   }
 
   def uniDocClassPath: T[Agg[PathRef]] = T {
+    val customizeFn = customizeUniDocClasspathDep()
     for {
       ivys <- Lib.resolveDependencies(
         repositories = repositoriesTask(),
         depToDependency = resolveUniDocClasspathDep(),
-        deps = uniDocIvyDeps() ++ T
-          .traverse(uniDocModuleDeps)(_.transitiveIvyDeps)()
-          .flatten
+        deps = uniDocClasspathIvyDeps()
       )
     } yield {
       ivys ++
@@ -114,7 +215,7 @@ trait UniDocModule extends mill.Module with CoursierModule {
     val uniDocClasspath = this.uniDocClassPath().map(_.path)
     val opts            = scalaDocOptions()
     val generateInkuire = this.generateInkuire()
-    val externals = scalaDocExternalMappings()
+    val externals       = scalaDocExternalMappings()
 
     Seq(
       "-classpath",
@@ -124,7 +225,8 @@ trait UniDocModule extends mill.Module with CoursierModule {
       })
     ) ++
       (if (generateInkuire) Seq("-Ygenerate-inkuire") else Seq()) ++
-      (if (externals.isEmpty) Seq() else Seq(s"-external-mappings:${externals.iterator.mkString(",")}")) ++
+      (if (externals.isEmpty) Seq()
+       else Seq(s"-external-mappings:${externals.iterator.mkString(",")}")) ++
       opts
   }
 
