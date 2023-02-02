@@ -25,7 +25,7 @@ object Platform {
   case object Other extends Platform("::")
 }
 
-case class DepGroup(groupID: String, version: String, prefix: String = "") {
+case class DepGroup(groupID: String, version: String, prefix: String = "", separator: String = "-") {
   def assemble(
       suffix: String,
       artifactID: String,
@@ -36,12 +36,10 @@ case class DepGroup(groupID: String, version: String, prefix: String = "") {
   ): Dep = {
     val theGroupID = if (groupID != null) groupID else this.groupID
     val theArtifactID =
-      if (suffix != null) s"$prefix$suffix"
-      else if (artifactID != null) artifactID
-      else
-        throw new IllegalArgumentException(
-          "Either suffix or artifactID must be non-null"
-        )
+      if (prefix != null && suffix != null && !prefix.isEmpty() && !suffix.isEmpty()) "$prefix$separator$suffix"
+      else if (suffix != null && !suffix.isEmpty()) suffix
+      else if (artifactID != null && !artifactID.isEmpty()) artifactID
+      else prefix.stripSuffix(separator)
     val theVersion = if (version != null) version else this.version
     ivy"$theGroupID${langVersion.value}$theArtifactID${platform.value}$theVersion"
   }
@@ -106,13 +104,7 @@ case class DepGroup(groupID: String, version: String, prefix: String = "") {
     case s => s.stripSuffix("-")
   }
 
-  object self
-      extends MultiDep(
-        jvm = jvm(artifactID = selfArtifactID),
-        js = js(artifactID = selfArtifactID)
-      ) {
-    val java = DepGroup.this.java(artifactID = selfArtifactID)
-  }
+  lazy val self: MultiDep = multi()
 }
 
 trait DepGroupImplicits {
