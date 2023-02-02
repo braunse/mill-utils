@@ -36,7 +36,7 @@ case class DepGroup(groupID: String, version: String, prefix: String = "", separ
   ): Dep = {
     val theGroupID = if (groupID != null) groupID else this.groupID
     val theArtifactID =
-      if (prefix != null && suffix != null && !prefix.isEmpty() && !suffix.isEmpty()) "$prefix$separator$suffix"
+      if (prefix != null && suffix != null && !prefix.isEmpty() && !suffix.isEmpty()) s"$prefix$separator$suffix"
       else if (suffix != null && !suffix.isEmpty()) suffix
       else if (artifactID != null && !artifactID.isEmpty()) artifactID
       else prefix.stripSuffix(separator)
